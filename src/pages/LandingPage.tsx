@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -38,7 +39,9 @@ export default function LandingPage() {
             FAQ
           </a>
         </div>
-        <Button className="rounded-full">Coba Gratis</Button>
+        <Button className="rounded-full" onClick={() => navigate("/chat")}>
+          Coba Gratis
+        </Button>
       </nav>
 
       {/* HERO */}
@@ -65,8 +68,13 @@ export default function LandingPage() {
           >
             Mulai Sekarang
           </Button>
-          <Button size="lg" variant="outline" className="h-12 px-8 text-lg">
-            Pelajari Lebih Lanjut
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-12 px-8 text-lg"
+            asChild
+          >
+            <a href="#features">Pelajari Lebih Lanjut</a>
           </Button>
         </div>
       </section>
@@ -220,7 +228,12 @@ export default function LandingPage() {
         <p className="mb-10 text-white/80">
           Mulai latihan sekarang dan tingkatkan peluangmu.
         </p>
-        <Button size="lg" variant="secondary" className="h-14 px-10 text-lg">
+        <Button
+          size="lg"
+          variant="secondary"
+          className="h-14 px-10 text-lg"
+          onClick={() => navigate("/chat")}
+        >
           Mulai Gratis Sekarang
         </Button>
       </section>
@@ -271,9 +284,9 @@ function FeatureCard({ icon, title, description }: any) {
 
 function ProblemCard({ text }: any) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-white to-slate-50 p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-white to-slate-50 p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
       {/* Glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute inset-0 bg-linear-to-r from-primary/10 via-transparent to-primary/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
       {/* Content */}
       <div className="relative z-10 flex items-start gap-4">
@@ -309,7 +322,7 @@ function Testimonial({ name, text }: any) {
   return (
     <div className="group relative overflow-hidden rounded-2xl border bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
       {/* Top gradient accent */}
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary to-indigo-500" />
+      <div className="absolute inset-x-0 top-0 h-1 bg-linear-to-r from-primary to-indigo-500" />
 
       <div className="flex flex-col gap-4">
         {/* Stars */}
