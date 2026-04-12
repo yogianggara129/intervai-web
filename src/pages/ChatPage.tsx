@@ -107,7 +107,6 @@ export default function ChatPage() {
       { answer: text },
       {
         onSuccess: (res) => {
-          // 🔥 HANDLE 204
           if (!res) {
             setMessages((prev) => [
               ...prev,
