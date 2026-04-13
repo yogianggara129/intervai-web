@@ -262,7 +262,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="border-t px-6 py-12 text-center text-sm text-slate-500">
-        © 2026 IntervAI — Built for future professionals 🚀
+        © 2026 IntervAI — Built for future professionals. Powered by YogiCodes
       </footer>
     </div>
   )
