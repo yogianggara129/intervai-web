@@ -1,8 +1,6 @@
 name: Docker Build & Push
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -41,12 +39,3 @@ jobs:
             VITE_BASE_URL=${{ vars.VITE_BASE_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Trigger deployment update
-        if: github.ref == 'refs/heads/main'
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.DEPLOY_PAT }}
-          repository: yogianggara129/intervai-deployment
-          event-type: web-updated
-          client-payload: '{"sha":"${{ github.sha }}"}'
