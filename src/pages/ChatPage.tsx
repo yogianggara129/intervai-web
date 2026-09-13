@@ -1,9 +1,9 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, User, Bot, Upload, Link2, ChevronLeft } from "lucide-react"
+import { Send, User, Bot, Upload, Link2, ChevronLeft, RefreshCw, AlertTriangle } from "lucide-react"
 
 import {
   useStartInterview,
@@ -27,6 +27,12 @@ interface Message {
   time: string
 }
 
+interface RetryState {
+  type: "start" | "send" | "summary"
+  payload?: { cv?: File; url?: string; answer?: string }
+  error?: string
+}
+
 export default function ChatPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>("setup")
@@ -42,6 +48,7 @@ export default function ChatPage() {
     },
   ])
   const [isFinished, setIsFinished] = useState(false)
+  const [retryState, setRetryState] = useState<RetryState | null>(null)
 
   const handleBack = () => {
     const confirmLeave = confirm("Interview akan hilang. Yakin mau keluar?")
@@ -58,9 +65,69 @@ export default function ChatPage() {
 
   const { data: summary, isLoading: isSummaryLoading } = useSummary(isFinished)
 
+  const handleStartError = useCallback((error: Error & { retryable?: boolean }) => {
+    if (error.retryable) {
+      setRetryState({
+        type: "start",
+        payload: { cv: cvFile!, url },
+        error: "Model sedang sibuk (503). Silakan coba lagi.",
+      })
+    }
+  }, [cvFile, url])
+
+  const executeRetry = useCallback(() => {
+    if (!retryState) return
+    const saved = retryState.payload
+    setRetryState(null)
+    if (retryState.type === "start" && saved?.cv && saved?.url) {
+      startInterviewMutate(
+        { cv: saved.cv, url: saved.url },
+        {
+          onSuccess: (data) => {
+            setMessages([
+              { id: Date.now(), role: "ai", text: data.feedback, time: now() },
+              { id: Date.now() + 1, role: "ai", text: data.question, time: now() },
+            ])
+            setStep("chat")
+          },
+          onError: handleStartError,
+        }
+      )
+    } else if (retryState.type === "send" && saved?.answer) {
+      const answerText = saved.answer
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now(), role: "user", text: answerText, time: now() },
+      ])
+      sendAnswerMutate(
+        { answer: answerText },
+        {
+          onSuccess: (res) => {
+            if (!res) { setIsFinished(true); return }
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now(), role: "ai", text: res.feedback, time: now() },
+              { id: Date.now() + 1, role: "ai", text: res.question, time: now() },
+            ])
+          },
+          onError: (err: Error & { retryable?: boolean }) => {
+            if (err.retryable) {
+              setMessages((prev) => prev.slice(0, -1))
+              setRetryState({
+                type: "send",
+                payload: { answer: answerText },
+                error: "Model sedang sibuk (503). Silakan coba lagi.",
+              })
+            }
+          },
+        }
+      )
+    }
+  }, [retryState, startInterviewMutate, sendAnswerMutate, handleStartError])
+
   /* ================= START ================= */
   const handleStart = () => {
-    if (!cvFile || !setUrl) return
+    if (!cvFile || !url) return
 
     startInterviewMutate(
       { cv: cvFile, url },
@@ -80,9 +147,9 @@ export default function ChatPage() {
               time: now(),
             },
           ])
-
           setStep("chat")
         },
+        onError: handleStartError,
       }
     )
   }
@@ -117,26 +184,24 @@ export default function ChatPage() {
                 time: now(),
               },
             ])
-
             setIsFinished(true)
             return
           }
-
           setMessages((prev) => [
             ...prev,
-            {
-              id: Date.now(),
-              role: "ai",
-              text: res.feedback,
-              time: now(),
-            },
-            {
-              id: Date.now() + 1,
-              role: "ai",
-              text: res.question,
-              time: now(),
-            },
+            { id: Date.now(), role: "ai", text: res.feedback, time: now() },
+            { id: Date.now() + 1, role: "ai", text: res.question, time: now() },
           ])
+        },
+        onError: (err: Error & { retryable?: boolean }) => {
+          if (err.retryable) {
+            setMessages((prev) => prev.slice(0, -1))
+            setRetryState({
+              type: "send",
+              payload: { answer: text },
+              error: "Model sedang sibuk (503). Silakan coba lagi.",
+            })
+          }
         },
       }
     )
@@ -172,6 +237,17 @@ export default function ChatPage() {
               className="border-none focus-visible:ring-0"
             />
           </div>
+
+          {retryState?.type === "start" && (
+            <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span className="flex-1">{retryState.error}</span>
+              <Button variant="outline" size="sm" onClick={executeRetry}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Coba Lagi
+              </Button>
+            </div>
+          )}
 
           <Button onClick={handleStart} disabled={!cvFile || !url || isPending}>
             {isPending ? "Memulai..." : "Mulai Interview"}
@@ -242,6 +318,18 @@ export default function ChatPage() {
             <p className="text-sm text-slate-400">
               IntervAI sedang mengetik...
             </p>
+          )}
+
+          {/* Retry banner during chat */}
+          {retryState?.type === "send" && (
+            <div className="flex items-center justify-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>{retryState.error}</span>
+              <Button variant="outline" size="sm" onClick={executeRetry}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Coba Lagi
+              </Button>
+            </div>
           )}
 
           {isFinished && isSummaryLoading && (

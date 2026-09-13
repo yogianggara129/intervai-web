@@ -30,6 +30,17 @@ export interface SummaryResponse {
   recommendation: "strong_hire" | "hire" | "maybe" | "no_hire"
 }
 
+// Extended responses that may include retryable flag
+export interface StartInterviewResponseExt extends StartInterviewResponse {
+  retryable?: boolean
+}
+export interface SendAnswerResponseExt extends SendAnswerResponse {
+  retryable?: boolean
+}
+export interface SummaryResponseExt extends SummaryResponse {
+  retryable?: boolean
+}
+
 let sessionId: string | null = null
 
 export const setSessionId = (id: string) => {
@@ -42,7 +53,7 @@ export const loadSessionId = () => {
   if (stored) sessionId = stored
 }
 
-const fetchWithSession = async (url: string, options: RequestInit = {}) => {
+const fetchWithSession = async <T>(url: string, options: RequestInit = {}): Promise<T & { retryable?: boolean }> => {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   }
@@ -59,17 +70,25 @@ const fetchWithSession = async (url: string, options: RequestInit = {}) => {
   })
 
   if (res.status === 204) {
-    return null
+    return null as unknown as T & { retryable?: boolean }
   }
 
-  if (!res.ok) throw new Error("Request failed")
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    // If server returned retryable flag or status is 503, mark as retryable
+    const isRetryable = res.status === 503 || data.retryable === true
+    const err = new Error(data?.error ?? 'Request failed') as Error & { retryable: boolean; status: number }
+    err.retryable = isRetryable
+    err.status = res.status
+    throw err
+  }
 
   return res.json()
 }
 
 export const startInterview = async (
   payload: StartInterviewPayload
-): Promise<StartInterviewResponse> => {
+): Promise<StartInterviewResponseExt> => {
   const formData = new FormData()
   formData.append("cv", payload.cv)
   formData.append("url", payload.url)
@@ -79,10 +98,16 @@ export const startInterview = async (
     body: formData,
   })
 
-  if (!res.ok) throw new Error("Failed to start interview")
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const isRetryable = res.status === 503 || data.retryable === true
+    const err = new Error(data?.error ?? 'Failed to start interview') as Error & { retryable: boolean; status: number }
+    err.retryable = isRetryable
+    err.status = res.status
+    throw err
+  }
 
   const data = await res.json()
-
   setSessionId(data.sessionId)
 
   return data
@@ -90,8 +115,8 @@ export const startInterview = async (
 
 export const sendAnswer = async (
   payload: SendAnswerPayload
-): Promise<SendAnswerResponse> => {
-  return fetchWithSession(`${VITE_BASE_URL}/interview/answer`, {
+): Promise<SendAnswerResponseExt> => {
+  return fetchWithSession<SendAnswerResponse>(`${VITE_BASE_URL}/interview/answer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -100,6 +125,6 @@ export const sendAnswer = async (
   })
 }
 
-export const getSummary = async (): Promise<SummaryResponse> => {
-  return fetchWithSession(`${VITE_BASE_URL}/interview/summary`)
+export const getSummary = async (): Promise<SummaryResponseExt> => {
+  return fetchWithSession<SummaryResponse>(`${VITE_BASE_URL}/interview/summary`)
 }
